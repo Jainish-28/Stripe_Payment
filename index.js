@@ -1,7 +1,7 @@
 const express = require('express')
 const app = express();
 const cors = require('cors');
-const port = 4000
+const port = 3003
 const Stripe = require("stripe");
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
@@ -13,10 +13,42 @@ const Order = require('./models/orders')
 dotenv.config()
 
 const stripe = Stripe(process.env.STRIPE_SECRET);
-mongoose.connect(process.env.MONGO_URL,{ useNewUrlParser: true, useUnifiedTopology: true }).then(() => console.log("db connected")).catch((err) => console.log(err));
+mongoose.connect(process.env.MONGO_URL).then(() => console.log("db connected")).catch((err) => console.log(err));
 
 
-const endpointSecret = "whsec_HZ77Ym7y2wZKMxDTFkMKFBDeYtzBN8f5";
+
+
+
+const createOrder = async (customer, data) => {
+  const Items = JSON.parse(customer.metadata.cart);
+
+  const products = Items.map((item) => {
+    return {
+      productId: item.id,
+      quantity: item.cartQuantity,
+    };
+  });
+
+  const newOrder = new Order({
+    userId: customer.metadata.userId,
+    customerId: data.customer,
+    // paymentIntentId: data.payment_intent,
+    products,
+    subtotal: data.amount_subtotal,
+    total: data.amount_total,
+    // shipping: data.customer_details,
+    payment_status: data.payment_status,
+  });
+
+  try {
+    const savedOrder = await newOrder.save();
+    console.log("Processed Order:", savedOrder);
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+const endpointSecret = "whsec_uLOhE2Qo1XdD87Y571rkBizD2EYKf9eb";
 
 
 
@@ -32,6 +64,8 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (request, respon
     return;
   }
  
+
+
   // Handle the event
   switch (event.type) {
     case 'payment_intent.succeeded':
